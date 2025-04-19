@@ -1,9 +1,13 @@
+use std::io;
+use std::path::Path;
+use std::sync::Arc;
+
 use iced::widget::horizontal_space;
 use iced::widget::keyed::column;
 use iced::widget::row;
 use iced::widget::{column, container, text, text_editor};
-use iced::Length;
-use iced::{Element, Sandbox, Settings, Theme};
+use iced::{executor, Length};
+use iced::{Application, Element, Settings, Theme};
 
 fn main() -> iced::Result {
     Editor::run(Settings::default())
@@ -16,27 +20,43 @@ struct Editor {
 #[derive(Debug, Clone)]
 enum Message {
     Edit(text_editor::Action),
+    FileOpened(Result<Arc<String>, io::ErrorKind>),
 }
 
-impl Sandbox for Editor {
+impl Application for Editor {
     type Message = Message;
+    type Theme = Theme;
+    type Flags = ();
+    type Executor = executor::Default;
 
-    fn new() -> Self {
-        Self {
-            content: text_editor::Content::with(include_str!("main.rs")),
-        }
+    fn new(_flags: Self::Flags) -> (Self, iced::Command<Message>) {
+        (
+            Self {
+                content: text_editor::Content::new(),
+            },
+            iced::Command::perform(
+                load_file(format!("{}/src/main.rs", env!("CARGO_MANIFEST_DIR"))),
+                Message::FileOpened,
+            ),
+        )
     }
 
     fn title(&self) -> String {
         String::from("Editor")
     }
 
-    fn update(&mut self, message: Message) {
+    fn update(&mut self, message: Message) -> iced::Command<Message> {
         match message {
             Message::Edit(action) => {
                 self.content.edit(action);
             }
+            Message::FileOpened(result) => {
+                if let Ok(content) = result {
+                    self.content = text_editor::Content::with(content.as_str());
+                }
+            }
         }
+        iced::Command::none()
     }
 
     fn view(&self) -> Element<'_, Message> {
@@ -55,4 +75,11 @@ impl Sandbox for Editor {
     fn theme(&self) -> Theme {
         Theme::Dark
     }
+}
+
+async fn load_file(path: impl AsRef<Path>) -> Result<Arc<String>, io::ErrorKind> {
+    tokio::fs::read_to_string(path)
+        .await
+        .map(Arc::new)
+        .map_err(|e| e.kind())
 }
