@@ -7,7 +7,7 @@ use iced::highlighter::{self, Highlighter};
 use iced::theme;
 use iced::widget::horizontal_space;
 use iced::widget::row;
-use iced::widget::{button, column, container, text, text_editor, tooltip};
+use iced::widget::{button, column, container, pick_list, text, text_editor, tooltip};
 use iced::{executor, Length};
 use iced::{Application, Element, Font, Settings, Theme};
 
@@ -25,6 +25,7 @@ struct Editor {
     path: Option<PathBuf>,
     content: text_editor::Content,
     error: Option<Error>,
+    theme: highlighter::Theme,
 }
 
 #[derive(Debug, Clone)]
@@ -35,6 +36,7 @@ enum Message {
     Save,
     FileSaved(Result<PathBuf, Error>),
     FileOpened(Result<(PathBuf, Arc<String>), Error>),
+    ThemeSelected(highlighter::Theme),
 }
 
 impl Application for Editor {
@@ -49,6 +51,7 @@ impl Application for Editor {
                 path: None,
                 content: text_editor::Content::new(),
                 error: None,
+                theme: highlighter::Theme::SolarizedDark,
             },
             iced::Command::perform(load_file(default_file()), Message::FileOpened),
         )
@@ -92,6 +95,10 @@ impl Application for Editor {
                 self.error = Some(error);
                 iced::Command::none()
             }
+            Message::ThemeSelected(theme) => {
+                self.theme = theme;
+                iced::Command::none()
+            }
         }
     }
 
@@ -99,7 +106,13 @@ impl Application for Editor {
         let controls = row![
             action(new_icon(), "New file", Message::New),
             action(open_icon(), "Open file", Message::Open),
-            action(save_icon(), "Save file", Message::Save)
+            action(save_icon(), "Save file", Message::Save),
+            horizontal_space(Length::Fill),
+            pick_list(
+                highlighter::Theme::ALL,
+                Some(self.theme),
+                Message::ThemeSelected
+            )
         ]
         .spacing(10);
 
@@ -107,7 +120,7 @@ impl Application for Editor {
             .on_edit(Message::Edit)
             .highlight::<Highlighter>(
                 highlighter::Settings {
-                    theme: highlighter::Theme::SolarizedDark,
+                    theme: self.theme,
                     extension: self
                         .path
                         .as_ref()
