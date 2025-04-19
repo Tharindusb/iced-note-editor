@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use iced::futures::future::ok;
+use iced::highlighter::{self, Highlighter};
 use iced::theme;
 use iced::widget::horizontal_space;
 use iced::widget::row;
@@ -12,6 +13,7 @@ use iced::{Application, Element, Font, Settings, Theme};
 
 fn main() -> iced::Result {
     Editor::run(Settings {
+        default_font: Font::MONOSPACE,
         fonts: vec![include_bytes!("../res/fonts/editor-icons.ttf")
             .as_slice()
             .into()],
@@ -101,7 +103,20 @@ impl Application for Editor {
         ]
         .spacing(10);
 
-        let input = text_editor(&self.content).on_edit(Message::Edit);
+        let input = text_editor(&self.content)
+            .on_edit(Message::Edit)
+            .highlight::<Highlighter>(
+                highlighter::Settings {
+                    theme: highlighter::Theme::SolarizedDark,
+                    extension: self
+                        .path
+                        .as_ref()
+                        .and_then(|path| path.extension()?.to_str())
+                        .unwrap_or("rs")
+                        .to_string(),
+                },
+                |highlight, _theme| highlight.to_format(),
+            );
 
         let status_bar = {
             let status = if let Some(Error::IOFailed(error)) = self.error.as_ref() {
